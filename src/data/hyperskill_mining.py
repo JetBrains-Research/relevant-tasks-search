@@ -12,15 +12,15 @@ def export_hyperskill_tasks(output_path: str, start_page: str):
         r = requests.get(f"https://hyperskill.org/api/steps?page={page_number}&format=json")
         info = json.loads(r.text)
         for step in info["steps"]:
-            if step["type"] == 'practice':
+            if step["type"] == "practice":
                 text = re.sub(r"\n", " ", step["block"]["text"])
                 step_id = str(step["id"])
                 topic_id = str(step["topic"])
                 title = step["title"]
-                results_fout.write(step_id + '\t' + topic_id + '\t' + title + '\t' + text + '\n')
+                results_fout.write(step_id + "\t" + topic_id + "\t" + title + "\t" + text + "\n")
                 lines_added += 1
         results_fout.close()
-        with open("./logs", 'a') as logs_fout:
+        with open("./logs", "a") as logs_fout:
             logs_fout.write(f"{page_number} done, {lines_added} lines added\n")
         print(f"{page_number} done, {lines_added} lines added")
         if info["meta"]["has_next"]:
