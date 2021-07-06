@@ -20,7 +20,7 @@ jobs:
         pip install -r requirements.txt
     - name: Lint with Black
       run: |
-        black . --check -l 120
+        black . --check -l 120 --diff --color
     - name: Run unit tests with pytest
       run: |
         PYTHONPATH=. pytest test
