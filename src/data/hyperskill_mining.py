@@ -3,6 +3,7 @@ import json
 import re
 import pickle
 import os
+import queue
 from pyvis.network import Network
 from argparse import ArgumentParser
 
@@ -89,9 +90,37 @@ def draw_hyperskill_knowledge_graph(output_path: str):
     net.show("graph.html")
 
 
+def calculate_distances(output_path: str):
+    if not os.path.exists(f"{output_path}/graph.pkl"):
+        raise Exception(f"{output_path}/graph.pkl is not exist, use 'build_hyperskill_knowledge_graph' first")
+    with open(f"{output_path}/graph.pkl", "rb") as fin:
+        dependencies = pickle.load(fin)
+    distances = {}
+    count = 0
+    for root in dependencies:
+        visited = {root}
+        q = queue.Queue()
+        q.put((root, 0))
+        distances[(root, root)] = 0
+        while not q.empty():
+            node, d = q.get()
+            for child in dependencies[node]:
+                if child not in visited:
+                    visited.add(child)
+                    q.put((child, d + 1))
+                    if (root, child) not in distances:
+                        distances[(root, child)] = d + 1
+                        distances[(child, root)] = d + 1
+        count += 1
+        if count % 100 == 0:
+            print(f"{int(100 * count / len(dependencies.keys()))}% completed. Distances calculated for {root}")
+    with open(f"{output_path}/distances.pkl", "wb") as fout:
+        pickle.dump(distances, fout)
+
+
 def configure_arg_parser() -> ArgumentParser:
     arg_parser = ArgumentParser()
-    arg_parser.add_argument("-t", "--task", choices=["tasks", "graph", "draw"], required=True)
+    arg_parser.add_argument("-t", "--task", choices=["tasks", "graph", "draw", "distances"], required=True)
     arg_parser.add_argument("-o", "--output", required=True, help="Path to output file")
     arg_parser.add_argument("-sp", "--start_page", required=False)
     return arg_parser
@@ -106,3 +135,5 @@ if __name__ == "__main__":
         build_hyperskill_knowledge_graph(__args.output, __args.start_page)
     elif __args.task == "draw":
         draw_hyperskill_knowledge_graph(__args.output)
+    elif __args.task == "distances":
+        calculate_distances(__args.output)
