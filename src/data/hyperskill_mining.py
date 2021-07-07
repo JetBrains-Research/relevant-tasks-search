@@ -10,7 +10,14 @@ import queue
 from pyvis.network import Network
 
 
-def export_hyperskill_tasks(output_path: str, start_page: str):
+def export_hyperskill_tasks(output_path: str, start_page: str) -> None:
+    """
+    Function used for exporting Hyperskill's tasks using public API.
+    Saving the result in ./output_path with in the following format:
+    step_id \t topic_id \t title \t text \n
+    :param output_path: string containing path to output file
+    :param start_page: page to start work with API
+    """
     page_number = int(start_page) if start_page is not None else 1
     while True:
         results_fout = open(output_path, "a")
@@ -35,7 +42,13 @@ def export_hyperskill_tasks(output_path: str, start_page: str):
             break
 
 
-def build_hyperskill_knowledge_graph(output_path: str, start_page: str):
+def build_hyperskill_knowledge_graph(output_path: str, start_page: str) -> None:
+    """
+    This function working with Hyperskill's public API and getting the knowledge graph as Python's dictionary.
+    Then saving it to output_path/graph.pkl.
+    :param output_path: string containing name of directory with output results
+    :param start_page: page to start work with API
+    """
     if not os.path.isdir("./logs"):
         os.mkdir("./logs")
     if not os.path.isdir(output_path):
@@ -77,7 +90,12 @@ def build_hyperskill_knowledge_graph(output_path: str, start_page: str):
             break
 
 
-def draw_hyperskill_knowledge_graph(output_path: str):
+def draw_hyperskill_knowledge_graph(output_path: str) -> None:
+    """
+    Function that draws knowledge graph, located in output_path.
+    Should be used after build_hyperskill_knowledge_graph.
+    :param output_path: string containing path to directory with graph.pkl
+    """
     if not os.path.exists(f"{output_path}/graph.pkl"):
         raise Exception(f"{output_path}/graph.pkl is not exist, use 'build_hyperskill_knowledge_graph' first")
     with open(f"{output_path}/graph.pkl", "rb") as fin:
@@ -92,7 +110,14 @@ def draw_hyperskill_knowledge_graph(output_path: str):
     net.show("graph.html")
 
 
-def calculate_distances(output_path: str):
+def calculate_distances(output_path: str) -> None:
+    """
+    Function to calculating all distances in graph, located in output_path directory, saving as Python's dictionary.
+    For calculation all distances used BFS, applied for all nodes sequentially.
+    After calculation saving distances in output_path/distances.pkl.
+    Should be used after build_hyperskill_knowledge_graph.
+    :param output_path: string containing path to directory with graph.pkl
+    """
     if not os.path.exists(f"{output_path}/graph.pkl"):
         raise Exception(f"{output_path}/graph.pkl is not exist, use 'build_hyperskill_knowledge_graph' first")
     with open(f"{output_path}/graph.pkl", "rb") as fin:
