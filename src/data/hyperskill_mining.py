@@ -67,7 +67,7 @@ def build_hyperskill_knowledge_graph(output_path: str, start_page: str) -> None:
                 dependencies[topic_id] = []
                 id_to_name[topic_id] = topic["title"]
                 name_to_id[topic["title"]] = topic_id
-            for candidate in topic["children"] + topic["followers"]:
+            for candidate in topic["children"] + topic["followers"] + topic["prerequisites"]:
                 if candidate not in dependencies[topic_id]:
                     dependencies_added += 1
                     dependencies[topic_id].append(candidate)
