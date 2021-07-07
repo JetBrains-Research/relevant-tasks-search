@@ -1,11 +1,13 @@
+from argparse import ArgumentParser
+
 import requests
 import json
 import re
+
 import pickle
 import os
 import queue
 from pyvis.network import Network
-from argparse import ArgumentParser
 
 
 def export_hyperskill_tasks(output_path: str, start_page: str):
