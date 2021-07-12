@@ -4,3 +4,4 @@ mypy==0.910
 pytest==6.2.4
 
 requests~=2.22.0
+pyvis~=0.1.9

@@ -34,7 +34,7 @@ def export_hyperskill_tasks(output_path: str, start_page: int):
                 step_id = str(step["id"])
                 topic_id = str(step["topic"])
                 title = step["title"]
-                results_fout.write("\t".join([step_id, topic_id, title, text]))
+                results_fout.write("\t".join([step_id, topic_id, title, text]) + "\n")
                 lines_added += 1
         results_fout.close()
         with open("./logs/logs_steps", "a") as logs_fout:
@@ -150,7 +150,8 @@ def calculate_distances(graph_path: str):
 def configure_arg_parser() -> ArgumentParser:
     arg_parser = ArgumentParser()
     arg_parser.add_argument("-t", "--task", choices=["tasks", "graph", "draw", "distances"], required=True)
-    arg_parser.add_argument("-o", "--output", required=True, help="Path to output file")
+    arg_parser.add_argument("-o", "--output", required=False, help="Path to output directory")
+    arg_parser.add_argument("-g", "--graph_path", required=False, help="Path to graph directory")
     arg_parser.add_argument("-sp", "--start_page", required=False)
     return arg_parser
 
@@ -158,6 +159,10 @@ def configure_arg_parser() -> ArgumentParser:
 if __name__ == "__main__":
     __arg_parser = configure_arg_parser()
     __args = __arg_parser.parse_args()
+    if __args.task in ["tasks", "graph"] and __args.output is None:
+        raise Exception(f"For tasks {__args.task} output path is required")
+    if __args.task in ["draw", "distances"] and __args.graph_path is None:
+        raise Exception(f"For tasks {__args.task} graph path is required")
     if __args.start_page is None:
         __args.start_page = 1
     else:
@@ -167,6 +172,6 @@ if __name__ == "__main__":
     elif __args.task == "graph":
         build_hyperskill_knowledge_graph(__args.output, __args.start_page)
     elif __args.task == "draw":
-        draw_hyperskill_knowledge_graph(__args.output)
+        draw_hyperskill_knowledge_graph(__args.graph_path)
     elif __args.task == "distances":
-        calculate_distances(__args.output)
+        calculate_distances(__args.graph_path)
