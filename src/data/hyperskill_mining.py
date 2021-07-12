@@ -10,7 +10,7 @@ import queue
 from pyvis.network import Network
 
 
-def export_hyperskill_tasks(output_path: str, start_page: str) -> None:
+def export_hyperskill_tasks(output_path: str, start_page: int):
     """
     Function used for exporting Hyperskill's tasks using public API.
     Saving the result in ./output_path with in the following format:
@@ -18,9 +18,13 @@ def export_hyperskill_tasks(output_path: str, start_page: str) -> None:
     :param output_path: string containing path to output file
     :param start_page: page to start work with API
     """
-    page_number = int(start_page) if start_page is not None else 1
+    if not os.path.isdir("./logs"):
+        os.mkdir("./logs")
+    if not os.path.isdir(output_path):
+        os.mkdir(output_path)
+    page_number = start_page
     while True:
-        results_fout = open(output_path, "a")
+        results_fout = open(f"{output_path}/steps.tsv", "a")
         lines_added = 0
         r = requests.get(f"https://hyperskill.org/api/steps?page={page_number}&format=json")
         info = json.loads(r.text)
@@ -30,7 +34,7 @@ def export_hyperskill_tasks(output_path: str, start_page: str) -> None:
                 step_id = str(step["id"])
                 topic_id = str(step["topic"])
                 title = step["title"]
-                results_fout.write(step_id + "\t" + topic_id + "\t" + title + "\t" + text + "\n")
+                results_fout.write("\t".join([step_id, topic_id, title, text]))
                 lines_added += 1
         results_fout.close()
         with open("./logs/logs_steps", "a") as logs_fout:
@@ -42,10 +46,10 @@ def export_hyperskill_tasks(output_path: str, start_page: str) -> None:
             break
 
 
-def build_hyperskill_knowledge_graph(output_path: str, start_page: str) -> None:
+def build_hyperskill_knowledge_graph(output_path: str, start_page: int):
     """
     This function working with Hyperskill's public API and getting the knowledge graph as Python's dictionary.
-    Then saving it to output_path/graph.pkl.
+    Then saving it to output_path/data.pkl.
     :param output_path: string containing name of directory with output results
     :param start_page: page to start work with API
     """
@@ -53,7 +57,7 @@ def build_hyperskill_knowledge_graph(output_path: str, start_page: str) -> None:
         os.mkdir("./logs")
     if not os.path.isdir(output_path):
         os.mkdir(output_path)
-    page_number = int(start_page) if start_page is not None else 1
+    page_number = start_page
     dependencies = {}
     id_to_name = {}
     name_to_id = {}
@@ -63,10 +67,11 @@ def build_hyperskill_knowledge_graph(output_path: str, start_page: str) -> None:
         info = json.loads(r.text)
         for topic in info["topics"]:
             topic_id = topic["id"]
-            if topic_id not in dependencies:
-                dependencies[topic_id] = []
+            if topic_id not in id_to_name:
                 id_to_name[topic_id] = topic["title"]
                 name_to_id[topic["title"]] = topic_id
+            if topic_id not in dependencies:
+                dependencies[topic_id] = []
             for candidate in topic["children"] + topic["followers"] + topic["prerequisites"]:
                 if candidate not in dependencies[topic_id]:
                     dependencies_added += 1
@@ -75,12 +80,9 @@ def build_hyperskill_knowledge_graph(output_path: str, start_page: str) -> None:
                         dependencies[candidate] = [topic_id]
                     else:
                         dependencies[candidate].append(topic_id)
-        with open(f"{output_path}/graph.pkl", "wb") as graph_fout:
-            pickle.dump(dependencies, graph_fout)
-        with open(f"{output_path}/id2name.pkl", "wb") as fout:
-            pickle.dump(id_to_name, fout)
-        with open(f"{output_path}/name2id.pkl", "wb") as fout:
-            pickle.dump(name_to_id, fout)
+        data = {"graph": dependencies, "id2name": id_to_name, "name2id": name_to_id}
+        with open(f"{output_path}/data.pkl", "wb") as data_fout:
+            pickle.dump(data, data_fout)
         with open("./logs/logs_graph", "a") as logs_fout:
             logs_fout.write(f"{page_number} done, {dependencies_added} dependencies added\n")
         print(f"{page_number} done, {dependencies_added} dependencies added")
@@ -90,16 +92,16 @@ def build_hyperskill_knowledge_graph(output_path: str, start_page: str) -> None:
             break
 
 
-def draw_hyperskill_knowledge_graph(output_path: str) -> None:
+def draw_hyperskill_knowledge_graph(graph_path: str):
     """
-    Function that draws knowledge graph, located in output_path.
+    Function that draws knowledge graph, located in graph_path.
     Should be used after build_hyperskill_knowledge_graph.
-    :param output_path: string containing path to directory with graph.pkl
+    :param graph_path: string containing path to directory with data.pkl
     """
-    if not os.path.exists(f"{output_path}/graph.pkl"):
-        raise Exception(f"{output_path}/graph.pkl is not exist, use 'build_hyperskill_knowledge_graph' first")
-    with open(f"{output_path}/graph.pkl", "rb") as fin:
-        dependencies = pickle.load(fin)
+    if not os.path.exists(f"{graph_path}/data.pkl"):
+        raise Exception(f"{graph_path}/data.pkl is not exist, use 'build_hyperskill_knowledge_graph' first")
+    with open(f"{graph_path}/data.pkl", "rb") as fin:
+        dependencies = pickle.load(fin)["dependencies"]
     net = Network(height=1080, width=1920, directed=False, notebook=False)
     net.barnes_hut(gravity=-10000, overlap=1, spring_length=1)
     for node in dependencies:
@@ -110,18 +112,18 @@ def draw_hyperskill_knowledge_graph(output_path: str) -> None:
     net.show("graph.html")
 
 
-def calculate_distances(output_path: str) -> None:
+def calculate_distances(graph_path: str):
     """
     Function to calculating all distances in graph, located in output_path directory, saving as Python's dictionary.
     For calculation all distances used BFS, applied for all nodes sequentially.
-    After calculation saving distances in output_path/distances.pkl.
+    After calculation saving distances in graph_path/distances.pkl.
     Should be used after build_hyperskill_knowledge_graph.
-    :param output_path: string containing path to directory with graph.pkl
+    :param graph_path: string containing path to directory with data.pkl
     """
-    if not os.path.exists(f"{output_path}/graph.pkl"):
-        raise Exception(f"{output_path}/graph.pkl is not exist, use 'build_hyperskill_knowledge_graph' first")
-    with open(f"{output_path}/graph.pkl", "rb") as fin:
-        dependencies = pickle.load(fin)
+    if not os.path.exists(f"{graph_path}/data.pkl"):
+        raise Exception(f"{graph_path}/data.pkl is not exist, use 'build_hyperskill_knowledge_graph' first")
+    with open(f"{graph_path}/data.pkl", "rb") as fin:
+        dependencies = pickle.load(fin)["dependencies"]
     distances = {}
     count = 0
     for root in dependencies:
@@ -141,7 +143,7 @@ def calculate_distances(output_path: str) -> None:
         count += 1
         if count % 100 == 0:
             print(f"{int(100 * count / len(dependencies.keys()))}% completed. Distances calculated for {root}")
-    with open(f"{output_path}/distances.pkl", "wb") as fout:
+    with open(f"{graph_path}/distances.pkl", "wb") as fout:
         pickle.dump(distances, fout)
 
 
@@ -156,6 +158,10 @@ def configure_arg_parser() -> ArgumentParser:
 if __name__ == "__main__":
     __arg_parser = configure_arg_parser()
     __args = __arg_parser.parse_args()
+    if __args.start_page is None:
+        __args.start_page = 1
+    else:
+        __args.start_page = int(__args.start_page)
     if __args.task == "tasks":
         export_hyperskill_tasks(__args.output, __args.start_page)
     elif __args.task == "graph":
