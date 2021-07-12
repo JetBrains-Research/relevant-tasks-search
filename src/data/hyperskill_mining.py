@@ -101,7 +101,7 @@ def draw_hyperskill_knowledge_graph(graph_path: str):
     if not os.path.exists(f"{graph_path}/data.pkl"):
         raise Exception(f"{graph_path}/data.pkl is not exist, use 'build_hyperskill_knowledge_graph' first")
     with open(f"{graph_path}/data.pkl", "rb") as fin:
-        dependencies = pickle.load(fin)["dependencies"]
+        dependencies = pickle.load(fin)["graph"]
     net = Network(height=1080, width=1920, directed=False, notebook=False)
     net.barnes_hut(gravity=-10000, overlap=1, spring_length=1)
     for node in dependencies:
@@ -123,7 +123,7 @@ def calculate_distances(graph_path: str):
     if not os.path.exists(f"{graph_path}/data.pkl"):
         raise Exception(f"{graph_path}/data.pkl is not exist, use 'build_hyperskill_knowledge_graph' first")
     with open(f"{graph_path}/data.pkl", "rb") as fin:
-        dependencies = pickle.load(fin)["dependencies"]
+        dependencies = pickle.load(fin)["graph"]
     distances = {}
     count = 0
     for root in dependencies:
