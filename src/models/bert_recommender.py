@@ -18,10 +18,10 @@ class BertRecommender:
     __distances_methods: Dict
 
     def __init__(
-            self,
-            from_file: bool = False,
-            bert_model: str = "roberta-base",
-            path_to_distances: str = "./data/graph/distances.pkl",
+        self,
+        from_file: bool = False,
+        bert_model: str = "roberta-base",
+        path_to_distances: str = "./data/graph/distances.pkl",
     ):
         # Distances load
         if not os.path.exists(path_to_distances):
@@ -60,8 +60,11 @@ class BertRecommender:
             vector = self.__calculate_vector(obj[2])
             self.__tasks.append(
                 Task(
-                    step_id=int(obj[0]), topic_id=int(obj[1]), preprocessed_text=obj[2],
-                    raw_text=BeautifulSoup(obj[3], "lxml").text, vector=vector
+                    step_id=int(obj[0]),
+                    topic_id=int(obj[1]),
+                    preprocessed_text=obj[2],
+                    raw_text=BeautifulSoup(obj[3], "lxml").text,
+                    vector=vector,
                 )
             )
 
@@ -100,7 +103,7 @@ class BertRecommender:
         return {"map@1": results[0], "map@3": results[1], "map@5": results[2], "mean graph distance": results[3]}
 
     def retrieve(
-            self, task_text: str = "", task: Task = None, k: int = 5, mode: str = "evaluation"
+        self, task_text: str = "", task: Task = None, k: int = 5, mode: str = "evaluation"
     ) -> List[Tuple[float, Task]]:
         if len(self.__tasks) == 0:
             raise Exception("Before evaluation you should use 'train' first")
