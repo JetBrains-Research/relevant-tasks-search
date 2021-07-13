@@ -3,6 +3,7 @@ from argparse import ArgumentParser
 import requests
 import json
 import re
+import numpy as np
 
 import pickle
 import os
@@ -124,22 +125,23 @@ def calculate_distances(graph_path: str):
         raise Exception(f"{graph_path}/data.pkl is not exist, use 'build_hyperskill_knowledge_graph' first")
     with open(f"{graph_path}/data.pkl", "rb") as fin:
         dependencies = pickle.load(fin)["graph"]
-    distances = {}
+    max_id = max(dependencies.keys())
+    distances = np.full((max_id + 1, max_id + 1), -1)
     count = 0
     for root in dependencies:
         visited = {root}
         q = queue.Queue()
         q.put((root, 0))
-        distances[(root, root)] = 0
+        distances[root, root] = 0
         while not q.empty():
             node, d = q.get()
             for child in dependencies[node]:
                 if child not in visited:
                     visited.add(child)
                     q.put((child, d + 1))
-                    if (root, child) not in distances:
-                        distances[(root, child)] = d + 1
-                        distances[(child, root)] = d + 1
+                    if distances[root, child] == -1:
+                        distances[root, child] = d + 1
+                        distances[child, root] = d + 1
         count += 1
         if count % 100 == 0:
             print(f"{int(100 * count / len(dependencies.keys()))}% completed. Distances calculated for {root}")
