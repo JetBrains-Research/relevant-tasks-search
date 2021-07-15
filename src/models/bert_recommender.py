@@ -8,6 +8,7 @@ from bs4 import BeautifulSoup
 from scipy.spatial import distance
 from tqdm import tqdm
 from transformers import AutoModel, AutoTokenizer
+from sentence_transformers import SentenceTransformer
 
 from src.models.task import Task
 
@@ -39,7 +40,8 @@ class BertRecommender:
         else:
             self.__tasks = []
         self.__tokenizer = AutoTokenizer.from_pretrained(bert_model)
-        self.__model = AutoModel.from_pretrained(bert_model)
+        # self.__model = AutoModel.from_pretrained(bert_model)
+        self.__model = SentenceTransformer("paraphrase-mpnet-base-v2")
         self.__distance_methods = {
             "cityblock": distance.cityblock,
             "euclidean": distance.euclidean,
@@ -77,10 +79,14 @@ class BertRecommender:
         aps = [0, 0, 0]
         dist_sum = 0
         counter = 0
+
         for line in tqdm(test_data, desc="evaluating"):
             obj = line.split("\t")
             test_task = self.create_task(
-                step_id=int(obj[0]), topic_id=int(obj[1]), preprocessed_text=obj[2], raw_text=obj[3]
+                step_id=int(obj[0]),
+                topic_id=int(obj[1]),
+                preprocessed_text=obj[2],
+                raw_text=obj[3],
             )
 
             relevant_tasks = self.retrieve(task=test_task, k=k)
@@ -92,7 +98,12 @@ class BertRecommender:
             counter += 1
 
         results = list(map(lambda x: x / counter, aps + [dist_sum]))
-        return {"map@1": results[0], "map@3": results[1], "map@5": results[2], "mean graph distance": results[3]}
+        return {
+            f"map@1@{t}": results[0],
+            f"map@3@{t}": results[1],
+            f"map@5@{t}": results[2],
+            "mean graph distance": results[3],
+        }
 
     def retrieve(self, task: Task, k: int = 5) -> List[Tuple[float, Task, float]]:
         if len(self.__tasks) == 0:
@@ -100,12 +111,13 @@ class BertRecommender:
 
         relevant_tasks = []
         for train_task in self.__tasks:
-            dist = self.__calculate_vector_distance(train_task=train_task, test_task=task, method="cityblock")
+            dist = self.__calculate_vector_distance(train_task=train_task, test_task=task, method="euclidean")
+            graph_dist = self.__graph_distances[train_task.topic_id, task.topic_id]
             if len(relevant_tasks) < k:
-                relevant_tasks.append((dist, train_task, self.__graph_distances[train_task.topic_id, task.topic_id]))
+                relevant_tasks.append((dist, train_task, graph_dist))
                 relevant_tasks.sort(key=lambda x: x[0])
             elif relevant_tasks[-1][0] > dist:
-                relevant_tasks[-1] = (dist, train_task, self.__graph_distances[train_task.topic_id, task.topic_id])
+                relevant_tasks[-1] = (dist, train_task, graph_dist)
                 relevant_tasks.sort(key=lambda x: x[0])
         return relevant_tasks
 
@@ -120,11 +132,12 @@ class BertRecommender:
         )
 
     def __calculate_vector(self, text) -> np.ndarray:
-        input_ids = torch.tensor(self.__tokenizer.encode(text, truncation=True)).unsqueeze(0)
-        outputs = self.__model(input_ids)
-        last_hidden_states = outputs[0]
-        # return last_hidden_states[0].data[0].numpy().flatten()
-        return last_hidden_states[0].data.numpy().mean(axis=0).flatten()
+        return self.__model.encode(text)
+        # input_ids = torch.tensor(self.__tokenizer.encode(text, truncation=True)).unsqueeze(0)
+        # outputs = self.__model(input_ids)
+        # last_hidden_states = outputs[0]
+        # # return last_hidden_states[0].data[0].numpy().flatten()
+        # return last_hidden_states[0].data.numpy().mean(axis=0).flatten()
 
     def __calculate_vector_distance(self, train_task: Task, test_task: Task, method: str = "cityblock") -> float:
         if method not in self.__distance_methods:
