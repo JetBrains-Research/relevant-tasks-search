@@ -135,6 +135,8 @@ def create_dataset(data_train: pd.DataFrame):
         tmp = []
         for index1 in data_train_sampled.index:
             for index2 in data_train_sampled.index:
+                if random.random() > 0.5:
+                    continue
                 if index2 <= index1:
                     continue
                 course_id1 = data_train_sampled.at[index1, "course_id"]
@@ -153,16 +155,52 @@ def create_dataset(data_train: pd.DataFrame):
         all.extend(tmp)
     dataset_train += random.sample(all, positive_size)
 
-    # Saving dataset to output_data dir
-    with open("../data/output_data/dataset_for_sbert.pkl", "rb") as fout:
-        pickle.dump(dataset_train, fout)
+    random.shuffle(dataset_train)
+    test_size = 0.0005
+    dataset_train, dataset_test = (
+        dataset_train[int(len(dataset_train) * test_size) :],
+        dataset_train[: int(len(dataset_train) * test_size)],
+    )
 
-    return dataset_train
+    # Saving dataset to output_data dir
+    with open("../data/output_data/dataset_train_for_sbert.pkl", "rb") as fout:
+        pickle.dump(dataset_train, fout)
+    with open("../data/output_data/dataset_test_for_sbert.pkl", "rb") as fout:
+        pickle.dump(dataset_test, fout)
+
+    return dataset_train, dataset_test
+
+
+def train(dataset_train: List[InputExample], dataset_test: List[InputExample]):
+    model_name = "paraphrase-multilingual-mpnet-base-v2"
+    train_batch_size = 16
+    num_epochs = 4
+    model_save_path = "../data/output_data/sbert_finetuned"
+
+    # Model init and other tools
+    model = SentenceTransformer(model_name)
+    train_dataloader = DataLoader(dataset_train, shuffle=True, batch_size=train_batch_size)
+    train_loss = losses.CosineSimilarityLoss(model=model)
+    evaluator = EmbeddingSimilarityEvaluator.from_input_examples(dataset_test, name="test split")
+
+    # Training
+    model.fit(
+        train_objectives=[(train_dataloader, train_loss)],
+        evaluator=evaluator,
+        epochs=num_epochs,
+        evaluation_steps=100,
+        output_path=model_save_path,
+        checkpoint_path="../data/output_data/checkpoints",
+        checkpoint_save_steps=2000,
+        checkpoint_save_total_limit=1,
+    )
 
 
 def main():
     paths = ["", "", ""]
     data_train, data_val, data_test = read_data(paths=paths)
+    dataset_train, dataset_test = create_dataset(data_train)
+    train(dataset_train, dataset_test)
 
 
 if __name__ == "__main__":
