@@ -1,3 +1,6 @@
+import os
+from argparse import ArgumentParser
+
 import numpy as np
 import pandas as pd
 from transformers import (
@@ -9,18 +12,50 @@ from transformers import (
 )
 from datasets import DatasetDict, load_metric
 import nltk
-from src.tools.sbert_finetuning import read_data
 
 
-def create_dataset(
-    data_train: pd.DataFrame,
-    data_val: pd.DataFrame,
-    data_test: pd.DataFrame,
-    data_courses: pd.DataFrame,
-    data_sections: pd.DataFrame,
-):
+def read_data(input_path: str, load_courses=False):
+    """
+    Used for reading data from input path and returning pd.DataFrames
+    :param input_path: path to dir with train/test/val .csv files
+    :param load_courses: if True, loading data about courses and sections too
+    :return:
+    """
+    if not isinstance(input_path, str):
+        raise Exception(f"You passed {type(input_path)} instead of str type")
+    if not os.path.exists(input_path):
+        raise FileNotFoundError(f"{input_path} doesn't exist")
 
-    dataset = pd.DataFrame({"text": data_train.preprocessed_text, "id": data_train.id})
+    data_train = pd.read_csv(input_path + "/train.csv")
+    data_val = pd.read_csv(input_path + "/val.csv")
+    data_test = pd.read_csv(input_path + "/test.csv")
+
+    data_train = data_train.dropna().reset_index(drop=True)
+    data_val = data_val.dropna().reset_index(drop=True)
+    data_test = data_test.dropna().reset_index(drop=True)
+
+    if load_courses:
+        data_courses = pd.read_csv(input_path + "/popular_courses.csv")
+        data_sections = pd.read_csv(input_path + "/popular_courses_sections.csv")
+        return data_train, data_val, data_test, data_courses, data_sections
+    else:
+        return data_train, data_val, data_test
+
+
+def create_dataset(input_path: str, output_path: str):
+    """
+    Used for dataset's creation. You should provide input path with train/test/val .csv files and
+    sections & courses data
+    :param input_path: path to load train/test/val .csv files and sections & courses data
+    :param output_path: path to save datasets
+    :return:
+    """
+    if not os.path.isdir(output_path):
+        os.mkdir(output_path)
+
+    data_train, data_val, data_test, data_courses, data_sections = read_data(input_path, load_courses=True)
+
+    dataset_train = pd.DataFrame({"text": data_train.preprocessed_text, "id": data_train.id})
     dataset_test = pd.DataFrame({"text": data_test.preprocessed_text, "id": data_test.id})
     dataset_val = pd.DataFrame({"text": data_val.preprocessed_text, "id": data_val.id})
 
@@ -32,17 +67,19 @@ def create_dataset(
     for index in data_sections.index:
         section2title[data_sections.at[index, "id"]] = data_sections.at[index, "title"]
 
-    dataset.text = "summarize: " + dataset.text + " </s>"
+    # Adding key word "summarize" which T5 is needed
+    dataset_train.text = "summarize: " + dataset_train.text + " </s>"
     dataset_test.text = "summarize: " + dataset_test.text + " </s>"
     dataset_val.text = "summarize: " + dataset_val.text + " </s>"
 
-    dataset["summary"] = ""
+    # Adding some king of summary - section_name + delimiter + course_name
+    dataset_train["summary"] = ""
     dataset_test["summary"] = ""
     dataset_val["summary"] = ""
     for index in data_train.index:
         course_id = data_train.at[index, "course_id"]
         section_id = data_train.at[index, "section_id"]
-        dataset.at[index, "summary"] = section2title[section_id] + " в курсе " + course2title[course_id]
+        dataset_train.at[index, "summary"] = section2title[section_id] + " в курсе " + course2title[course_id]
     for index in data_test.index:
         course_id = data_test.at[index, "course_id"]
         section_id = data_test.at[index, "section_id"]
@@ -52,12 +89,21 @@ def create_dataset(
         section_id = data_val.at[index, "section_id"]
         dataset_val.at[index, "summary"] = section2title[section_id] + " в курсе " + course2title[course_id]
 
-    dataset.to_csv("./tmp/dataset_train.csv", index=False, header=True)
-    dataset_test.to_csv("./tmp/dataset_test.csv", index=False, header=True)
-    dataset_val.to_csv("./tmp/dataset_val.csv", index=False, header=True)
+    # Saving datasets to the output dir
+    dataset_train.to_csv(output_path + "/dataset_train.csv", index=False, header=True)
+    dataset_test.to_csv(output_path + "/dataset_test.csv", index=False, header=True)
+    dataset_val.to_csv(output_path + "/dataset_val.csv", index=False, header=True)
 
 
 def preprocess_function(examples, tokenizer, max_length=512):
+    """
+    This function is used to tokenized text in datasets
+    Adopt by me almost without changes from https://github.com/huggingface/notebooks/blob/master/examples/summarization.ipynb
+    :param examples: dataset
+    :param tokenizer: tokenizer to use
+    :param max_length: max length of sequence in tokens
+    :return:
+    """
     inputs = [doc for doc in examples["text"]]
     model_inputs = tokenizer(inputs, max_length=max_length, truncation=True, padding="max_length")
 
@@ -70,6 +116,14 @@ def preprocess_function(examples, tokenizer, max_length=512):
 
 
 def compute_metrics(eval_pred, tokenizer, metric):
+    """
+    This function is used to compute ROUGE metric.
+    Adopt by me almost without changes from https://github.com/huggingface/notebooks/blob/master/examples/summarization.ipynb
+    :param eval_pred:
+    :param tokenizer:
+    :param metric:
+    :return:
+    """
     predictions, labels = eval_pred
     decoded_preds = tokenizer.batch_decode(predictions, skip_special_tokens=True)
     # Replace -100 in the labels as we can't decode them.
@@ -91,13 +145,31 @@ def compute_metrics(eval_pred, tokenizer, metric):
     return {k: round(v, 4) for k, v in result.items()}
 
 
-def train():
-    raw_datasets = DatasetDict.from_csv(
-        {"train": "./dataset_train.csv", "test": "./dataset_test.csv", "validation": "./dataset_val.csv"}
-    )
-    metric = load_metric("rouge")
+def train(
+    input_path: str, output_path: str, metric_name: str = "rouge", model_checkpoint: str = "cointegrated/rut5-small"
+):
+    """
+    Used for training. You should provide input path with already computed datasets
+    :param input_path: path to directory with datasets
+    :param output_path: where to save trained model
+    :param metric_name: metric to compute while training
+    :param model_checkpoint: checkpoint to start finetuning
+    :return:
+    """
+    if not os.path.exists(input_path):
+        raise FileNotFoundError(f"{input_path} doesn't exist")
+    if not os.path.isdir(output_path):
+        os.mkdir(output_path)
 
-    model_checkpoint = "cointegrated/rut5-small"
+    raw_datasets = DatasetDict.from_csv(
+        {
+            "train": input_path + "/dataset_train.csv",
+            "test": input_path + "/dataset_test.csv",
+            "validation": input_path + "/dataset_val.csv",
+        }
+    )
+    metric = load_metric(metric_name)
+
     tokenizer = AutoTokenizer.from_pretrained(model_checkpoint)
     model = AutoModelForSeq2SeqLM.from_pretrained(model_checkpoint)
 
@@ -105,7 +177,7 @@ def train():
 
     batch_size = 4
     args = Seq2SeqTrainingArguments(
-        "../data/output_data/rut5_finetuned",
+        output_path + "/rut5_finetuned",
         evaluation_strategy="steps",
         eval_steps=200,
         learning_rate=2e-5,
@@ -119,11 +191,14 @@ def train():
         predict_with_generate=True,
         logging_steps=200,
         logging_first_step=True,
-        logging_dir="./logs",
+        logging_dir=output_path + "/logs",
         push_to_hub=False,
     )
 
-    nltk.download("punkt")
+    try:
+        nltk.data.find("tokenizers/punkt")
+    except LookupError:
+        nltk.download("punkt")
 
     data_collator = DataCollatorForSeq2Seq(tokenizer, model=model)
 
@@ -139,17 +214,21 @@ def train():
 
     trainer.train()
 
-    model.save_pretrained("../data/output_data/rut5_finetuned")
+    model.save_pretrained(output_path + "/rut5_finetuned")
 
 
-def main():
-    paths = ["", "", ""]
-    data_train, data_val, data_test = read_data(paths=paths)
-    data_courses = pd.read_csv("popular_courses.csv")
-    data_sections = pd.read_csv("popular_courses_sections.csv")
-    create_dataset(data_train, data_val, data_test, data_courses, data_sections)
-    train()
+def configure_arg_parser() -> ArgumentParser:
+    arg_parser = ArgumentParser()
+    arg_parser.add_argument("-t", "--task", choices=["create_dataset", "train"], required=True)
+    arg_parser.add_argument("-o", "--output", required=True, help="Path to output directory")
+    arg_parser.add_argument("-i", "--input", required=True, help="Path to input directory")
+    return arg_parser
 
 
 if __name__ == "__main__":
-    pass
+    __arg_parser = configure_arg_parser()
+    __args = __arg_parser.parse_args()
+    if __args.task == "create_dataset":
+        create_dataset(__args.input, __args.output)
+    elif __args.task == "train":
+        train(__args.input, __args.output)
