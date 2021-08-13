@@ -3,16 +3,21 @@ black==21.6b0
 mypy==0.910
 pytest==6.2.4
 
-requests~=2.22.0
-pyvis~=0.1.9
-numpy~=1.19.5
-torch~=1.9.0
+# NLP
 transformers~=4.8.2
-tqdm~=4.60.0
-scipy~=1.4.1
 beautifulsoup4~=4.9.3
 lxml~=4.6.3
 sentence_transformers~=2.0.0
+nltk~=3.4.5
+datasets~=1.11.0
 
+# Data preprocessing
+requests~=2.22.0
+pyvis~=0.1.9
+numpy~=1.19.5
 pandas~=1.2.3
-bs4~=0.0.1
+tqdm~=4.60.0
+scipy~=1.4.1
+
+# NN
+torch~=1.9.0
