@@ -26,17 +26,17 @@ def read_data(input_path: str, load_courses=False):
     if not os.path.exists(input_path):
         raise FileNotFoundError(f"{input_path} doesn't exist")
 
-    data_train = pd.read_csv(input_path + "/train.csv")
-    data_val = pd.read_csv(input_path + "/val.csv")
-    data_test = pd.read_csv(input_path + "/test.csv")
+    data_train = pd.read_csv(os.path.join(input_path, "train.csv"))
+    data_val = pd.read_csv(os.path.join(input_path, "val.csv"))
+    data_test = pd.read_csv(os.path.join(input_path, "test.csv"))
 
     data_train = data_train.dropna().reset_index(drop=True)
     data_val = data_val.dropna().reset_index(drop=True)
     data_test = data_test.dropna().reset_index(drop=True)
 
     if load_courses:
-        data_courses = pd.read_csv(input_path + "/popular_courses.csv")
-        data_sections = pd.read_csv(input_path + "/popular_courses_sections.csv")
+        data_courses = pd.read_csv(os.path.join(input_path, "popular_courses.csv"))
+        data_sections = pd.read_csv(os.path.join(input_path, "popular_courses_sections.csv"))
         return data_train, data_val, data_test, data_courses, data_sections
     else:
         return data_train, data_val, data_test
@@ -90,9 +90,9 @@ def create_dataset(input_path: str, output_path: str):
         dataset_val.at[index, "summary"] = section2title[section_id] + " в курсе " + course2title[course_id]
 
     # Saving datasets to the output dir
-    dataset_train.to_csv(output_path + "/dataset_train.csv", index=False, header=True)
-    dataset_test.to_csv(output_path + "/dataset_test.csv", index=False, header=True)
-    dataset_val.to_csv(output_path + "/dataset_val.csv", index=False, header=True)
+    dataset_train.to_csv(os.path.join(output_path, "dataset_train.csv"), index=False, header=True)
+    dataset_test.to_csv(os.path.join(output_path, "dataset_test.csv"), index=False, header=True)
+    dataset_val.to_csv(os.path.join(output_path, "dataset_val.csv"), index=False, header=True)
 
 
 def preprocess_function(examples, tokenizer, max_length=512):
@@ -163,9 +163,9 @@ def train(
 
     raw_datasets = DatasetDict.from_csv(
         {
-            "train": input_path + "/dataset_train.csv",
-            "test": input_path + "/dataset_test.csv",
-            "validation": input_path + "/dataset_val.csv",
+            "train": os.path.join(input_path, "dataset_train.csv"),
+            "test": os.path.join(input_path, "dataset_test.csv"),
+            "validation": os.path.join(input_path, "dataset_val.csv"),
         }
     )
     metric = load_metric(metric_name)
@@ -177,7 +177,7 @@ def train(
 
     batch_size = 4
     args = Seq2SeqTrainingArguments(
-        output_path + "/rut5_finetuned",
+        os.path.join(output_path, "rut5_finetuned"),
         evaluation_strategy="steps",
         eval_steps=200,
         learning_rate=2e-5,
@@ -191,7 +191,7 @@ def train(
         predict_with_generate=True,
         logging_steps=200,
         logging_first_step=True,
-        logging_dir=output_path + "/logs",
+        logging_dir=os.path.join(output_path, "logs"),
         push_to_hub=False,
     )
 
@@ -214,7 +214,7 @@ def train(
 
     trainer.train()
 
-    model.save_pretrained(output_path + "/rut5_finetuned")
+    model.save_pretrained(os.path.join(output_path, "rut5_finetuned"))
 
 
 def configure_arg_parser() -> ArgumentParser:

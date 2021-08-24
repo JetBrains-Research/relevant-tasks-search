@@ -218,21 +218,21 @@ def create_dataset(input_path: str, output_path: str):
     dataset_train += different_lessons_samples(data_train, label=0.75, positive_size=positive_size)
 
     # Negative examples (same Stepik's block, different courses)
-    with open(input_path + "/stepik_blocks.pkl", "rb") as fin:
+    with open(os.path.join(input_path, "stepik_blocks.pkl"), "rb") as fin:
         stepik_blocks = pickle.load(fin)
     dataset_train += different_courses_samples(data_train, stepik_blocks, label=0.25, positive_size=positive_size)
 
     random.shuffle(dataset_train)
-    test_size = 0.0005
+    test_size = 0.1
     dataset_train, dataset_test = (
         dataset_train[int(len(dataset_train) * test_size) :],
         dataset_train[: int(len(dataset_train) * test_size)],
     )
 
     # Saving dataset to output_path dir
-    with open(output_path + "/dataset_train_for_sbert.pkl", "wb") as fout:
+    with open(os.path.join(output_path, "dataset_train_for_sbert.pkl"), "wb") as fout:
         pickle.dump(dataset_train, fout)
-    with open(output_path + "/dataset_test_for_sbert.pkl", "wb") as fout:
+    with open(os.path.join(output_path, "dataset_test_for_sbert.pkl"), "wb") as fout:
         pickle.dump(dataset_test, fout)
 
 
@@ -245,14 +245,14 @@ def train(input_path: str, output_path: str, model_name: str = "paraphrase-multi
     :return:
     """
     # Loading dataset from input path
-    with open(input_path + "/dataset_train_for_sbert.pkl", "rb") as fin:
+    with open(os.path.join(input_path, "dataset_train_for_sbert.pkl"), "rb") as fin:
         dataset_train = pickle.load(fin)
-    with open(input_path + "/dataset_test_for_sbert.pkl", "rb") as fin:
+    with open(os.path.join(input_path, "dataset_test_for_sbert.pkl"), "rb") as fin:
         dataset_test = pickle.load(fin)
 
     train_batch_size = 16
     num_epochs = 1
-    model_save_path = output_path + "/sbert_finetuned"
+    model_save_path = os.path.join(output_path, "sbert_finetuned")
 
     # Model init and other tools
     model = SentenceTransformer(model_name)
@@ -265,9 +265,9 @@ def train(input_path: str, output_path: str, model_name: str = "paraphrase-multi
         train_objectives=[(train_dataloader, train_loss)],
         evaluator=evaluator,
         epochs=num_epochs,
-        evaluation_steps=100,
+        evaluation_steps=2000,
         output_path=model_save_path,
-        checkpoint_path=output_path + "/checkpoints",
+        checkpoint_path=os.path.join(output_path, "checkpoints"),
         checkpoint_save_steps=500,
         checkpoint_save_total_limit=1,
     )
