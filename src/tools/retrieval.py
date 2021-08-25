@@ -70,10 +70,7 @@ def retrieve_to_file(
         )
 
     # saving
-    if file_type == "tsv":
-        sep = "\t"
-    else:
-        sep = ","
+    sep = "\t" if file_type == "tsv" else ","
     ans.to_csv(os.path.join(output_path, "retrieval.csv"), sep=sep, index=False, header=True)
 
 
