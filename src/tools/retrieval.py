@@ -43,15 +43,13 @@ def retrieve_to_file(
     for i, dist_vector in enumerate(dists):
         # append row, representing test task
         ans = ans.append(
-            pd.DataFrame(
-                {
-                    "step_text": [tasks_to_retrieve.at[i, "preprocessed_text"]],
-                    "step_id": [tasks_to_retrieve.at[i, "id"]],
-                    "course_id": [tasks_to_retrieve.at[i, "course_id"]],
-                    "distance": [""],
-                    "top_N": [""],
-                }
-            )
+            {
+                "step_text": [tasks_to_retrieve.at[i, "preprocessed_text"]],
+                "step_id": [tasks_to_retrieve.at[i, "id"]],
+                "course_id": [tasks_to_retrieve.at[i, "course_id"]],
+                "distance": [""],
+                "top_N": [""],
+            }
         )
         # sorted indexes
         indexes = dist_vector.argsort()
@@ -62,15 +60,13 @@ def retrieve_to_file(
         tmp = tasks_existing.iloc[indexes]
         # append top_k closest tasks
         ans = ans.append(
-            pd.DataFrame(
-                {
-                    "step_text": tmp.preprocessed_text,
-                    "step_id": tmp.id,
-                    "course_id": tmp.course_id,
-                    "distance": dist_vector[indexes],
-                    "top_N": list(range(1, top_k + 1)),
-                }
-            )
+            {
+                "step_text": tmp.preprocessed_text,
+                "step_id": tmp.id,
+                "course_id": tmp.course_id,
+                "distance": dist_vector[indexes],
+                "top_N": list(range(1, top_k + 1)),
+            }
         )
 
     # saving
